@@ -2,8 +2,6 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
-import 'package:path/path.dart' as path;
-import 'package:path_provider/path_provider.dart';
 import 'result_screen.dart';
 
 late List<CameraDescription> cameras;
@@ -16,7 +14,8 @@ class ScanScreen extends StatefulWidget {
 }
 
 class _ScanScreenState extends State<ScanScreen> {
-  CameraController? _controller;
+  CameraController? _controller; 
+  bool _isCameraReady = false;   
   late Future<void> _initializeControllerFuture;
 
   @override
@@ -25,12 +24,25 @@ class _ScanScreenState extends State<ScanScreen> {
     _initCamera();
   }
 
-  void _initCamera() async {
-    cameras = await availableCameras();
-    _controller = CameraController(cameras[0], ResolutionPreset.medium);
-    _initializeControllerFuture = _controller!.initialize();
-    if (mounted) {
-      setState(() {});
+  Future<void> _initCamera() async {
+    try {
+      cameras = await availableCameras();
+      if (cameras.isEmpty) {
+        print("Tidak ada kamera terdeteksi!");
+        return;
+      }
+
+      _controller = CameraController(cameras[0], ResolutionPreset.medium);
+      _initializeControllerFuture = _controller!.initialize();
+      await _initializeControllerFuture;
+
+      if (mounted) {
+        setState(() {
+          _isCameraReady = true;
+        });
+      }
+    } catch (e) {
+      print("Gagal inisialisasi kamera: $e");
     }
   }
 
@@ -42,44 +54,43 @@ class _ScanScreenState extends State<ScanScreen> {
 
   Future<String> _ocrFromFile(File imageFile) async {
     final inputImage = InputImage.fromFile(imageFile);
-    final textRecognizer = TextRecognizer(script: TextRecognitionScript.latin);
-    final RecognizedText recognizedText = await textRecognizer.processImage(inputImage);
+    final textRecognizer =
+        TextRecognizer(script: TextRecognitionScript.latin);
+    final RecognizedText recognizedText =
+        await textRecognizer.processImage(inputImage);
     textRecognizer.close();
     return recognizedText.text;
   }
 
- Future<void> _takePicture() async {
-  try {
-    await _initializeControllerFuture;
+  Future<void> _takePicture() async {
+    try {
+      if (_controller == null || !_controller!.value.isInitialized) return;
+      final XFile image = await _controller!.takePicture();
 
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Memproses OCR, mohon tunggu...'), duration: Duration(seconds: 2)),
-    );
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Memproses OCR, mohon tunggu...')),
+      );
 
-    // tambahkan ! karena _controller nullable
-    final XFile image = await _controller!.takePicture();
+      final ocrText = await _ocrFromFile(File(image.path));
 
-    final ocrText = await _ocrFromFile(File(image.path));
-
-    if (!mounted) return;
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => ResultScreen(ocrText: ocrText)),
-    );
-  } catch (e) {
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Error saat mengambil/memproses foto: $e')),
-    );
+      if (!mounted) return;
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => ResultScreen(ocrText: ocrText)),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error saat ambil gambar: $e')),
+      );
+    }
   }
-}
-
 
   @override
   Widget build(BuildContext context) {
-    if (_controller == null || !_controller!.value.isInitialized) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    if (!_isCameraReady || _controller == null) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
     }
 
     return Scaffold(
@@ -101,7 +112,7 @@ class _ScanScreenState extends State<ScanScreen> {
             ),
           ),
         ],
-      ),
-    );
-  }
+     ),
+);
+}
 }
