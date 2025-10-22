@@ -14,8 +14,8 @@ class ScanScreen extends StatefulWidget {
 }
 
 class _ScanScreenState extends State<ScanScreen> {
-  CameraController? _controller; 
-  bool _isCameraReady = false;   
+  CameraController? _controller;
+  bool _isCameraReady = false;
   late Future<void> _initializeControllerFuture;
 
   @override
@@ -28,7 +28,7 @@ class _ScanScreenState extends State<ScanScreen> {
     try {
       cameras = await availableCameras();
       if (cameras.isEmpty) {
-        print("Tidak ada kamera terdeteksi!");
+        print("⚠️ Tidak ada kamera terdeteksi!");
         return;
       }
 
@@ -42,7 +42,7 @@ class _ScanScreenState extends State<ScanScreen> {
         });
       }
     } catch (e) {
-      print("Gagal inisialisasi kamera: $e");
+      print("❌ Gagal inisialisasi kamera: $e");
     }
   }
 
@@ -79,8 +79,16 @@ class _ScanScreenState extends State<ScanScreen> {
         MaterialPageRoute(builder: (_) => ResultScreen(ocrText: ocrText)),
       );
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error saat ambil gambar: $e')),
+        const SnackBar(
+          content: Text(
+            'Pemindaian Gagal! Periksa Izin Kamera atau coba lagi.',
+            style: TextStyle(color: Colors.white),
+          ),
+          backgroundColor: Colors.redAccent,
+          duration: Duration(seconds: 3),
+        ),
       );
     }
   }
@@ -88,8 +96,21 @@ class _ScanScreenState extends State<ScanScreen> {
   @override
   Widget build(BuildContext context) {
     if (!_isCameraReady || _controller == null) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
+      return Scaffold(
+        backgroundColor: Colors.grey[900],
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: const [
+              CircularProgressIndicator(color: Colors.yellow),
+              SizedBox(height: 20),
+              Text(
+                'Memuat Kamera... Harap tunggu.',
+                style: TextStyle(color: Colors.white, fontSize: 18),
+              ),
+            ],
+          ),
+        ),
       );
     }
 
@@ -112,7 +133,7 @@ class _ScanScreenState extends State<ScanScreen> {
             ),
           ),
         ],
-     ),
-);
-}
+      ),
+    );
+  }
 }
